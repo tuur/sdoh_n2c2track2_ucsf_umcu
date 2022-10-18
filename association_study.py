@@ -7,6 +7,7 @@ from statsmodels.genmod import families
 from statsmodels.imputation.mice import MICEData, MICE
 import statsmodels.api as sm
 from copy import copy
+from tableone import TableOne
 
 # statsmodels.imputation.mice.MICEData
 
@@ -18,25 +19,43 @@ class AssociationStudy():
         self.xvars=xvars
         self.yvar=yvar
 
+
+
+        if cca:
+            self.df = self.df.dropna()
+
+        mytable = TableOne(self.df, groupby='DNR_ANY', pval=False)
+        print(mytable.tabulate(tablefmt="fancy_grid"))
+
         self.X_df = pandas.get_dummies(self.df[self.xvars], drop_first=True)
+        #self.X_df_tmp = pandas.get_dummies(self.df[self.xvars], drop_first=False)
+        #renaming = {cname: cname.replace(' ', '_') for cname in self.X_df_tmp.columns}
+        #self.X_df.rename(renaming)
         print('columns',self.X_df.columns)
         self.y_df = self.df[self.yvar]
         self.Xy_df = copy(self.X_df)
         self.Xy_df[self.yvar]=self.y_df
 
+
+
         if cca:
-            self.df=self.df.dropna()
-            self.formula = self.yvar + ' ~ ' + ' + '.join(self.xvars)
+            self.X_df['Intercept']=1
+            self.formula = self.yvar + ' ~ ' + ' + '.join(['"'+v+'"' for v in self.xvars])
             print('\n\n',60*'=','> outcome events:',self.df[self.yvar].sum(),'\n',self.formula)
             self.model = GLM(self.y_df,self.X_df, family=families.Binomial()).fit(attach_wls=True, atol=1e-10)
         #self.model = smf.Logit(self.df[[self.yvar]],self.df[self.xvars]).fit()
+
+            mytable = TableOne(self.Xy_df, groupby='DNR_ANY', pval=False)
+
             print(self.model.summary())
         else:
             imp = MICEData(self.Xy_df, k_pmm=5)
+            #self.X_df=self.X_df.rename(columns=renaming)
+
             fml = self.yvar + ' ~ ' + ' + '.join(self.X_df.columns)
             print(fml)
             mice = MICE(fml, sm.GLM, imp, init_kwds={"family": sm.families.Binomial()})
-            results = mice.fit(10, 10)
+            results = mice.fit(10, 20)
             print(results.summary())
 
 
@@ -219,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('-mimic_discharge_sochist', required=False, help='...', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/mimic_discharge_sochist.csv")
     parser.add_argument('-n2c2_alignment', required=False, help='Use n2c2 txt ids (if ann dir uses n2c2 ids instead of mimic row ids).', type=int)
     parser.add_argument('-load_df', required=False, help='Directory where the .ann files are stored.')
-    #parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/association_study SHAC/S1/")
+    #parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/association_study SHAC/S4/")
     parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/all_mimic_discharge/S4/")
 
     args = parser.parse_args()
@@ -273,30 +292,31 @@ if __name__ == '__main__':
     print('living_status',collections.Counter(SELECTION['living_status']))
 
     # composite predictors
-    alcohol_composite = {'current':'current_or_past','none':'none','past':'current_or_past','current_or_past':'current_or_past',None:'NR'}
+    employment_composite = {'employed':'employed','unemployed':'REST','on_disability':'REST','retired':'REST',None:None,'student':'REST','homemaker':'REST'}
+    SELECTION['employment_status']=SELECTION.apply(lambda row: employment_composite[row.employment_status], axis=1)
+
+    living_composite = {'homeless':'REST','with_family':'with_family','with_others':'REST','alone':'REST',None:None}
+    SELECTION['living_status']=SELECTION.apply(lambda row: living_composite[row.living_status], axis=1)
+
+    tobacco_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
+    SELECTION['tobacco_status']=SELECTION.apply(lambda row: tobacco_composite[row.tobacco_status], axis=1)
+
+    alcohol_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None, 'future':'REST'}
     SELECTION['alcohol_status']=SELECTION.apply(lambda row: alcohol_composite[row.alcohol_status], axis=1)
 
-    alcohol_composite = {'current':'current_or_past','none':'none','past':'current_or_past','current_or_past':'current_or_past',None:'NR'}
-    SELECTION['alcohol_status']=SELECTION.apply(lambda row: alcohol_composite[row.alcohol_status], axis=1)
+    drug_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
+    SELECTION['drug_status']=SELECTION.apply(lambda row: drug_composite[row.drug_status], axis=1)
+
+    covars = ['employment_status','tobacco_status','alcohol_status','drug_status','living_status','AGE','GENDER','ADMISSION_TYPE']
+    # Multivariate analysis
+    print('MICE')
+    AssociationStudy(SELECTION, covars,'DNR_ANY', cca=False)
+    print('CCA')
+    AssociationStudy(SELECTION, covars,'DNR_ANY', cca=True)
 
 
-    AssociationStudy(SELECTION, ['employment_status','AGE'],'DNR_ANY', cca=False)
+    # TODO fix extract_code_status_from_discharge_summary (add full code?)
 
-    #AssociationStudy(SELECTION, ['tobacco_status','AGE','GENDER'],'DNR_ANY', cca=False)
-
-    AssociationStudy(SELECTION, ['alcohol_status','AGE'],'DNR_ANY', cca=False)
-
-    #AssociationStudy(SELECTION, ['living_status','AGE','GENDER'],'DNR_ANY', cca=False)
-
-
-
-    # TODO: option to recognize and read zip ann folders!!!!
-
-    # TODO fix extract_code_status_from_discharge_summary
-
-    # TODO: detect codes in "CODE STATUS:" part of disarge summary
-    # TODO: exclude missing cases? Check other DNR studies.
-    # TODO: share subject id and note id mapping
 
 
 
