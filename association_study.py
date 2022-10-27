@@ -1,4 +1,4 @@
-import argparse, pickle, glob, re, pandas, collections, math, numpy
+import argparse, re, pandas, collections, math, numpy
 import statsmodels.formula.api as smf
 from dateutil.parser import parse as parsedatetime
 from brat_scoring.corpus import Corpus
@@ -8,55 +8,54 @@ from statsmodels.imputation.mice import MICEData, MICE
 import statsmodels.api as sm
 from copy import copy
 from tableone import TableOne
-
+from glob import glob
 # statsmodels.imputation.mice.MICEData
-
+import dill as pickle
 
 class AssociationStudy():
 
-    def __init__(self, df, xvars, yvar, cca):
-        self.df = df[xvars + [yvar]]
+    def __init__(self, df, xvars, yvar, imp_vars, cca=False):
+        all_relevant_vars = list(set(xvars + [yvar] + imp_vars))
+        self.df = df[all_relevant_vars]
         self.xvars=xvars
         self.yvar=yvar
-
+        self.results=None
+        self.imp_vars=imp_vars
 
 
         if cca:
             self.df = self.df.dropna()
 
-        mytable = TableOne(self.df, groupby='DNR_ANY', pval=False)
-        print(mytable.tabulate(tablefmt="fancy_grid"))
-
         self.X_df = pandas.get_dummies(self.df[self.xvars], drop_first=True)
-        #self.X_df_tmp = pandas.get_dummies(self.df[self.xvars], drop_first=False)
-        #renaming = {cname: cname.replace(' ', '_') for cname in self.X_df_tmp.columns}
-        #self.X_df.rename(renaming)
-        print('columns',self.X_df.columns)
+        self.imp_df = pandas.get_dummies(self.df[self.imp_vars], drop_first=True)
+        imp_vars_names = self.imp_df.columns
         self.y_df = self.df[self.yvar]
+
+        #self.Xy_df = pandas.concat([self.X_df, self.y_df])
         self.Xy_df = copy(self.X_df)
         self.Xy_df[self.yvar]=self.y_df
-
-
+        for v in self.imp_df.columns:
+            if not v in self.Xy_df.columns:
+                #print(v)
+                self.Xy_df[v] = copy(self.imp_df[v])
 
         if cca:
             self.X_df['Intercept']=1
             self.formula = self.yvar + ' ~ ' + ' + '.join(['"'+v+'"' for v in self.xvars])
             print('\n\n',60*'=','> outcome events:',self.df[self.yvar].sum(),'\n',self.formula)
-            self.model = GLM(self.y_df,self.X_df, family=families.Binomial()).fit(attach_wls=True, atol=1e-10)
-        #self.model = smf.Logit(self.df[[self.yvar]],self.df[self.xvars]).fit()
-
-            mytable = TableOne(self.Xy_df, groupby='DNR_ANY', pval=False)
-
-            print(self.model.summary())
+            model = GLM(self.y_df,self.X_df, family=families.Binomial()).fit(attach_wls=True, atol=1e-10)
+            print(model.summary())
+            self.results=model
         else:
-            imp = MICEData(self.Xy_df, k_pmm=5)
-            #self.X_df=self.X_df.rename(columns=renaming)
-
+            imp = MICEData(self.Xy_df, k_pmm=10)
+            for xvar in self.Xy_df.columns:
+                imp.set_imputer(xvar, xvar + ' ~ ' + ' + '.join(imp_vars_names))
             fml = self.yvar + ' ~ ' + ' + '.join(self.X_df.columns)
             print(fml)
             mice = MICE(fml, sm.GLM, imp, init_kwds={"family": sm.families.Binomial()})
-            results = mice.fit(10, 20)
+            results = mice.fit(10, 10)
             print(results.summary())
+            self.results=results
 
 
 def add_n2c2_note_ids(admissions, file_alignment):
@@ -239,7 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('-n2c2_alignment', required=False, help='Use n2c2 txt ids (if ann dir uses n2c2 ids instead of mimic row ids).', type=int)
     parser.add_argument('-load_df', required=False, help='Directory where the .ann files are stored.')
     #parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/association_study SHAC/S4/")
-    parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/all_mimic_discharge/S4/")
+    parser.add_argument('-pred_ann_dirs', required=False, help='Directory where the .ann files are stored.')
 
     args = parser.parse_args()
 
@@ -258,65 +257,128 @@ if __name__ == '__main__':
 
         with open('admissions_df.p', 'wb') as f:
             pickle.dump(ADMISSIONS,f)
-    else:
-        with open(args.load_df, 'rb') as f:
-            ADMISSIONS = pickle.load(f)
+    #else:
+    #    with open(args.load_df, 'rb') as f:
+    #        ADMISSIONS = pickle.load(f)
 
     # get SDOH annotations info
-    sdoh_df, ADMISSIONS = read_sdoh_annotations(ADMISSIONS, args.ann_dir, args.mimic_file_alignment, args.n2c2_alignment)
-    ADMISSIONS = exclude_n2c2_rows(ADMISSIONS, args.excl_dir, args.mimic_file_alignment)
 
-    print('ADMISSIONS initial:',len(ADMISSIONS))
-    ADMISSIONS = ADMISSIONS[~ADMISSIONS['EVENTNOTEROWID'].isnull()]
-    print('ADMISSIONS with linkable notes:',len(ADMISSIONS))
-    # select only 18-69
-    ADMISSIONS = ADMISSIONS[ADMISSIONS['AGE'] >= 18]
-    ADMISSIONS = ADMISSIONS[ADMISSIONS['AGE'] <= 89]
-    print('ADMISSIONS after age 18-89:',len(ADMISSIONS))
-    # excluded documents used to train / fine tune the text mining models
-    ADMISSIONS = ADMISSIONS[ADMISSIONS['TO_EXCLUDE']==False]
-    print('ADMISSIONS minus fine-tuning data:',len(ADMISSIONS))
+    study_results = {}
+    for pred_path in glob(args.pred_ann_dirs+"/*", recursive = False):
+        #print(pred_path)
+        dirname = pred_path.split('/')[-1]
+        print('>>>>', dirname)
+        with open(args.load_df, 'rb') as f:
+            ADMISSIONS = pickle.load(f)
+        sdoh_df, ADMISSIONS = read_sdoh_annotations(ADMISSIONS, pred_path, args.mimic_file_alignment, args.n2c2_alignment)
+        ADMISSIONS = exclude_n2c2_rows(ADMISSIONS, args.excl_dir, args.mimic_file_alignment)
 
-    ADMISSIONS['DNR_ANY'] = ADMISSIONS.apply(lambda row: int(row.DNR or row.TXT_DNR), axis=1)
-    print('ADMISSIONS DNR prevalence:', round(sum(ADMISSIONS['DNR_ANY'])/len(ADMISSIONS)*100,2),'%')
+        print('ADMISSIONS initial:',len(ADMISSIONS))
+        ADMISSIONS = ADMISSIONS[~ADMISSIONS['EVENTNOTEROWID'].isnull()]
+        print('ADMISSIONS with linkable notes:',len(ADMISSIONS))
+        # select only 18-69
+        ADMISSIONS = ADMISSIONS[ADMISSIONS['AGE'] >= 18]
+        ADMISSIONS = ADMISSIONS[ADMISSIONS['AGE'] <= 89]
+        print('ADMISSIONS after age 18-89:',len(ADMISSIONS))
+        # excluded documents used to train / fine tune the text mining models
+        ADMISSIONS = ADMISSIONS[ADMISSIONS['TO_EXCLUDE']==False]
+        print('ADMISSIONS minus fine-tuning data:',len(ADMISSIONS))
 
-    SELECTION = ADMISSIONS[ADMISSIONS['sdoh_extracted']==True]
-    print('SELECTION:',len(SELECTION))
-    print('SELECTION DNR prevalence:', round(sum(SELECTION['DNR_ANY'])/len(SELECTION)*100,2),'%')
-    print('SELECTION DNR N:', round(sum(SELECTION['DNR_ANY']),2))
+        ADMISSIONS['DNR_ANY'] = ADMISSIONS.apply(lambda row: int(row.DNR or row.TXT_DNR), axis=1)
+        print('ADMISSIONS DNR prevalence:', round(sum(ADMISSIONS['DNR_ANY'])/len(ADMISSIONS)*100,2),'%')
 
-    print('employment_status',collections.Counter(SELECTION['employment_status']))
-    print('tobacco_status',collections.Counter(SELECTION['tobacco_status']))
-    print('drug_status',collections.Counter(SELECTION['drug_status']))
-    print('alcohol_status',collections.Counter(SELECTION['alcohol_status']))
-    print('living_status',collections.Counter(SELECTION['living_status']))
+        SELECTION = ADMISSIONS[ADMISSIONS['sdoh_extracted']==True]
+        print('SELECTION:',len(SELECTION))
+        print('SELECTION DNR prevalence:', round(sum(SELECTION['DNR_ANY'])/len(SELECTION)*100,2),'%')
+        print('SELECTION DNR N:', round(sum(SELECTION['DNR_ANY']),2))
 
-    # composite predictors
-    employment_composite = {'employed':'employed','unemployed':'REST','on_disability':'REST','retired':'REST',None:None,'student':'REST','homemaker':'REST'}
-    SELECTION['employment_status']=SELECTION.apply(lambda row: employment_composite[row.employment_status], axis=1)
+        print('employment_status',collections.Counter(SELECTION['employment_status']))
+        print('tobacco_status',collections.Counter(SELECTION['tobacco_status']))
+        print('drug_status',collections.Counter(SELECTION['drug_status']))
+        print('alcohol_status',collections.Counter(SELECTION['alcohol_status']))
+        print('living_status',collections.Counter(SELECTION['living_status']))
 
-    living_composite = {'homeless':'REST','with_family':'with_family','with_others':'REST','alone':'REST',None:None}
-    SELECTION['living_status']=SELECTION.apply(lambda row: living_composite[row.living_status], axis=1)
+        # composite predictors
+        employment_composite = {'employed':'employed','unemployed':'REST','on_disability':'REST','retired':'REST',None:None,'student':'REST','homemaker':'REST'}
+        SELECTION['employment_status']=SELECTION.apply(lambda row: employment_composite[row.employment_status], axis=1)
 
-    tobacco_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
-    SELECTION['tobacco_status']=SELECTION.apply(lambda row: tobacco_composite[row.tobacco_status], axis=1)
+        living_composite = {'homeless':'REST','with_family':'with_family','with_others':'REST','alone':'REST',None:None}
+        SELECTION['living_status']=SELECTION.apply(lambda row: living_composite[row.living_status], axis=1)
 
-    alcohol_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None, 'future':'REST'}
-    SELECTION['alcohol_status']=SELECTION.apply(lambda row: alcohol_composite[row.alcohol_status], axis=1)
+        tobacco_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
+        SELECTION['tobacco_status']=SELECTION.apply(lambda row: tobacco_composite[row.tobacco_status], axis=1)
 
-    drug_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
-    SELECTION['drug_status']=SELECTION.apply(lambda row: drug_composite[row.drug_status], axis=1)
+        alcohol_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None, 'future':'REST'}
+        SELECTION['alcohol_status']=SELECTION.apply(lambda row: alcohol_composite[row.alcohol_status], axis=1)
 
-    covars = ['employment_status','tobacco_status','alcohol_status','drug_status','living_status','AGE','GENDER','ADMISSION_TYPE']
-    # Multivariate analysis
-    print('MICE')
-    AssociationStudy(SELECTION, covars,'DNR_ANY', cca=False)
-    print('CCA')
-    AssociationStudy(SELECTION, covars,'DNR_ANY', cca=True)
+        drug_composite = {'current':'current_or_past','none':'REST','past':'current_or_past','current_or_past':'current_or_past',None:None,'future':'REST'}
+        SELECTION['drug_status']=SELECTION.apply(lambda row: drug_composite[row.drug_status], axis=1)
+
+        covars = ['AGE','GENDER','ETHNICITY','RELIGION']
+        determinants = ['employment_status','tobacco_status','alcohol_status','drug_status','living_status']
+        imputation_vars = list(set(covars + determinants + ['AGE','GENDER','ETHNICITY','RELIGION','MARITAL_STATUS','ADMISSION_LOCATION','INSURANCE','ADMISSION_TYPE','DIAGNOSIS']))
+        #print(collections.Counter(SELECTION['ETHNICITY']))
+        print('imputation_vars',imputation_vars)
+
+        ETHNICITY_map = {'UNKNOWN/NOT SPECIFIED':'NOT_SPECIFIED',
+                         'PATIENT DECLINED TO ANSWER':'NOT_SPECIFIED',
+                         'UNABLE TO OBTAIN':'NOT_SPECIFIED',
+                         'HISPANIC/LATINO - PUERTO RICAN':'HISPANIC_LATINO',
+                         'WHITE - OTHER EUROPEAN':'WHITE',
+                         'ASIAN - ASIAN INDIAN':'ASIAN',
+                         'HISPANIC/LATINO - DOMINICAN':'HISPANIC_LATINO',
+                         'WHITE - BRAZILIAN':'WHITE',
+                         'BLACK/CAPE VERDEAN':'OTHER',
+                         'ASIAN - CHINESE':'ASIAN',
+                         'ASIAN - CAMBODIAN':'ASIAN',
+                         'HISPANIC/LATINO - CENTRAL AMERICAN (OTHER)':'HISPANIC_LATINO',
+                         'NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER':'OTHER',
+                         'WHITE - RUSSIAN':'WHITE',
+                         'MULTI RACE ETHNICITY':'OTHER',
+                         'AMERICAN INDIAN/ALASKA NATIVE FEDERALLY RECOGNIZED TRIBE':'OTHER',
+                         'AMERICAN INDIAN/ALASKA NATIVE':'OTHER',
+                         'BLACK/AFRICAN':'OTHER',
+                         'PORTUGUESE':'OTHER',
+                         'ASIAN - VIETNAMESE':'ASIAN',
+                         'ASIAN - FILIPINO':'ASIAN',
+                         'HISPANIC/LATINO - SALVADORAN':'HISPANIC_LATINO',
+                         'HISPANIC/LATINO - CUBAN':'HISPANIC_LATINO',
+                         'BLACK/HAITIAN':'OTHER',
+                         'WHITE':'WHITE',
+                         'BLACK/AFRICAN AMERICAN':'BLACK_AFRICAN_AMERICAN',
+                         'HISPANIC OR LATINO':'HISPANIC_LATINO'
+                         }
+
+        #print(collections.Counter(SELECTION['RELIGION']))
+
+        RELIGION_map = {
+            'CATHOLIC':'CATHOLIC',
+            'NOT SPECIFIED':'NOT_SPECIFIED',
+            'NOT_SPECIFIED':'NOT_SPECIFIED',
+            'PROTESTANT QUAKER':'PROTESTANT',
+            'UNOBTAINABLE':'NOT_SPECIFIED',
+            'JEWISH':'JEWISH'
+        }
+
+        #SELECTION['MARITAL_STATUS'] = SELECTION['MARITAL_STATUS'].apply(lambda x: numpy.nan if x=='MARITAL_STATUS_UNKNOWN_DEFAULT' else x.strip().replace(' ','_').replace('(','').replace(')','') if isinstance(x, str) else x)
+        SELECTION['RELIGION'] = SELECTION['RELIGION'].apply(lambda x: x.strip().replace(' ','_').replace('(','').replace(')','') if isinstance(x, str) else x)
+        SELECTION['ETHNICITY'] = SELECTION['ETHNICITY'].apply(lambda x: ETHNICITY_map[x] if x in ETHNICITY_map else 'OTHER' if isinstance(x, str) else 'NOT_SPECIFIED')
+        SELECTION['RELIGION'] = SELECTION['RELIGION'].apply(lambda x: RELIGION_map[x] if x in RELIGION_map else 'OTHER' if isinstance(x, str) else 'NOT_SPECIFIED')
+
+        # Table 1
+        mytable = TableOne(SELECTION[determinants + covars + ['DNR_ANY']], groupby='DNR_ANY', pval=True)
+        print(mytable.tabulate(tablefmt="fancy_grid"))
+
+        # Multivariate analysis
+        study_results[dirname] = {}
+        for determinant in determinants:
+            study = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', imputation_vars, cca=False)
+            study_results[dirname][determinant] = study.results
 
 
-    # TODO fix extract_code_status_from_discharge_summary (add full code?)
-
+    out_dir = [x for x in args.pred_ann_dirs.split('/') if not x==''][-1]
+    with open('study_results'+out_dir+'.p', 'wb') as f:
+        pickle.dump((SELECTION, study_results),f)
 
 
 
