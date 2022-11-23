@@ -1,5 +1,5 @@
 
-This code is associated with our submissions to the [N2C2 Shared Task - Track 2](https://n2c2.dbmi.hms.harvard.edu/2022-track-2), on extraction of social determinants of health from clinica notes.
+This code is associated with our submissions to the [N2C2 Shared Task - Track 2](https://n2c2.dbmi.hms.harvard.edu/2022-track-2), on extraction of social determinants of health from clinical notes.
 
 # What is here:
 
