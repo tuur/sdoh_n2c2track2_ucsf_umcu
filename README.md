@@ -17,10 +17,10 @@ For this reason we cannot share this data here.
 
 # Reference
 
-Results from our submissions are reported in an [AMIA](https://amia.org/education-events/amia-2022-annual-symposium) abstract:
+Results from our submissions are reported in the attached abstract:
 
-> Madhumita Sushil, Atul J. Butte, Ewoud Schuit, Artuur M. Leeuwenberg. Cross-institution extraction of social determinants of health from 
-clinical notes: an evaluation of methods. AMIA Natural Language Processing Working Group Pre-Symposium. November, 2022.
+> Madhumita Sushil, Atul J. Butte, Ewoud Schuit, Artuur M. Leeuwenberg. [Cross-institution extraction of social determinants of health from 
+clinical notes: an evaluation of methods](https://github.com/tuur/sdoh_n2c2track2_ucsf_umcu/blob/main/N2C2%20Abstract.pdf). AMIA Natural Language Processing Working Group Pre-Symposium. November, 2022.
 
 
 
