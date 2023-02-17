@@ -5,12 +5,16 @@ from brat_scoring.corpus import Corpus
 from statsmodels.genmod.generalized_linear_model import GLM
 from statsmodels.genmod import families
 from statsmodels.imputation.mice import MICEData, MICE
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score, f1_score
 import statsmodels.api as sm
 from copy import copy
 from tableone import TableOne
 from glob import glob
 # statsmodels.imputation.mice.MICEData
 import dill as pickle
+import sys
+old_stdout = sys.stdout
 
 class AssociationStudy():
 
@@ -22,24 +26,28 @@ class AssociationStudy():
         self.results=None
         self.imp_vars=imp_vars
 
-
         if cca:
             self.df = self.df.dropna()
 
         self.X_df = pandas.get_dummies(self.df[self.xvars], drop_first=True)
-        self.imp_df = pandas.get_dummies(self.df[self.imp_vars], drop_first=True)
-        imp_vars_names = self.imp_df.columns
-        self.y_df = self.df[self.yvar]
+        if not cca:
+            self.imp_df = pandas.get_dummies(self.df[self.imp_vars], drop_first=True)
+            imp_vars_names = self.imp_df.columns
 
-        #self.Xy_df = pandas.concat([self.X_df, self.y_df])
-        self.Xy_df = copy(self.X_df)
-        self.Xy_df[self.yvar]=self.y_df
-        for v in self.imp_df.columns:
-            if not v in self.Xy_df.columns:
-                #print(v)
-                self.Xy_df[v] = copy(self.imp_df[v])
+        self.y_df = self.df[self.yvar]
+        #self.Xy_df = copy(self.X_df)
+        self.Xy_df = pandas.concat([self.X_df, self.y_df], axis=1)
+        #self.Xy_df[self.yvar]=self.y_df
+
+        if not cca:
+            newcolumns = [colname for colname in self.imp_df.columns if not colname in self.Xy_df.columns]
+            self.Xy_df = pandas.concat([self.Xy_df, self.imp_df[newcolumns]], axis=1)
+            #for v in self.imp_df.columns:
+            #    if not v in self.Xy_df.columns:
+            #        self.Xy_df[v] = self.imp_df[v]
 
         if cca:
+            print('CCA ANALYSIS')
             self.X_df['Intercept']=1
             self.formula = self.yvar + ' ~ ' + ' + '.join(['"'+v+'"' for v in self.xvars])
             print('\n\n',60*'=','> outcome events:',self.df[self.yvar].sum(),'\n',self.formula)
@@ -47,6 +55,7 @@ class AssociationStudy():
             print(model.summary())
             self.results=model
         else:
+            print('MICE ANALYSIS')
             imp = MICEData(self.Xy_df, k_pmm=10)
             for xvar in self.Xy_df.columns:
                 imp.set_imputer(xvar, xvar + ' ~ ' + ' + '.join(imp_vars_names))
@@ -57,6 +66,7 @@ class AssociationStudy():
             print(results.summary())
             self.results=results
 
+        print(cca,'SIZE:',sys.getsizeof(self.results))
 
 def add_n2c2_note_ids(admissions, file_alignment):
     alignment = pandas.read_csv(file_alignment)
@@ -89,6 +99,28 @@ def add_dnr_status(admissions, dnr_status_path):
 
     dnr_status_composite = {hadm: dnr_status[hadm] in DNR_OUTCOMESET if hadm in dnr_status else False for hadm in admissions['HADM_ID']}
     admissions['DNR'] = admissions['HADM_ID'].map(dnr_status_composite)
+    return admissions
+
+def add_annotated_dnr_status(admissions, dnr_ann_dir):
+    #print(add_annotated_dnr_status)
+    ids = {}
+    for pred_path in glob(dnr_ann_dir + "/*.ann", recursive=False):
+        eventnoteid = int(pred_path.split("/")[-1].replace(".ann",""))
+        #print(eventnoteid, pred_path)
+
+        with open(pred_path, 'r') as f:
+            annotation_txt = f.read()
+            ids[eventnoteid] = True if ("DNR" in annotation_txt or "DNI" in annotation_txt) else False
+            #print(annotation_txt)
+            #print(ids[eventnoteid])
+
+        #ids.add(eventnoteid)
+    #print(len(ids))
+
+    #idsinadm = [id for id in ids if id in admissions['EVENTNOTEROWID']]
+    #idsnotinadm = [id for id in ids if not id in admissions['EVENTNOTEROWID']]
+
+    admissions['ANNOTATED_DNR_DNI'] = admissions['EVENTNOTEROWID'].map(ids)
 
     return admissions
 
@@ -100,13 +132,19 @@ def extract_code_status_from_discharge_summary(admissions): # TODO: bugfix, lowe
         hadmid = int(r[1]['HADM_ID'])
         txt_dnr[hadmid] = False
         if isinstance(txt, str):
-            codestatuslines = re.findall(r'.+dnr.+\n',txt.lower())
-            codestatuslines += re.findall(r'.+do not resuscitate.+\n',txt.lower())
+            codestatuslines = re.findall(r'.+dnr.*\n',txt.lower())
+            codestatuslines += re.findall(r'.+dni.*\n',txt.lower()) # added dni
+            codestatuslines += re.findall(r'.+do[ -]not[ -]resuscitate.+\n',txt.lower())
             codestatuslines += re.findall(r'.+do not intubate.+\n',txt.lower())
-            codestatuslines += re.findall(r'.+code status.+\n',txt.lower())
+            #codestatuslines += re.findall(r'.+code status.+\n',txt.lower())
+            codestatuslines += re.findall(r'.+code.+\n',txt.lower())
+
             for codestatusline in codestatuslines:
-                if (('dnr' in codestatusline or 'do not resuscitate' in codestatusline or 'do not intubate' in codestatusline) and not 'full code' in codestatusline):
+                if (('dnr' in codestatusline or 'dni ' in codestatusline or 'dni\n' in codestatusline or 'do-not-resuscitate' in codestatusline or 'do not resuscitate' in codestatusline or 'do not intubate' in codestatusline) ): # added dni
                     txt_dnr[hadmid]= True
+            #if 'DNI ' in txt or 'DNI\n' in txt:
+            #    txt_dnr[hadmid] = True
+
 
     admissions['TXT_DNR'] = admissions['HADM_ID'].map(txt_dnr)
     return admissions
@@ -161,7 +199,6 @@ def exclude_n2c2_rows(admissions, ann_file_dir_of_files_to_be_excluded, n2c2_ali
     return admissions
 
 def read_sdoh_annotations(admissions, ann_file_dir, n2c2_alignment_path, n2c2_alignment=False):
-# TODO: # TODO: option to recognize and read zip ann folders!!!!
 
     print(ann_file_dir)
     sdoh_data = []
@@ -177,7 +214,6 @@ def read_sdoh_annotations(admissions, ann_file_dir, n2c2_alignment_path, n2c2_al
         employment_status, tobacco_status, drug_status, alcohol_status, living_status = None, None, None, None, None
         if n2c2_alignment:
             doc_id=alignment_dict[int(doc_id)]
-
 
         for e in doc.events():
             if e.type_ =='LivingStatus':
@@ -220,9 +256,7 @@ def read_sdoh_annotations(admissions, ann_file_dir, n2c2_alignment_path, n2c2_al
     sdoh_df = pandas.DataFrame(sdoh_data, columns=['EVENTNOTEROWID','employment_status','tobacco_status','drug_status','alcohol_status','living_status','sdoh_extracted'])
     admissions=pandas.merge(admissions, sdoh_df, on=['EVENTNOTEROWID'], how='left')
 
-    #print('difference',set(sdoh_df['EVENTNOTEROWID']).difference(admissions['EVENTNOTEROWID']))
     # TODO; CHECK IF THOSE 93 IN THE DIFFERENCE ARE outside of the age range.
-    #pd.merge(a, b, on=['A', 'B'])
 
     return sdoh_df, admissions
 
@@ -238,9 +272,13 @@ if __name__ == '__main__':
     parser.add_argument('-n2c2_alignment', required=False, help='Use n2c2 txt ids (if ann dir uses n2c2 ids instead of mimic row ids).', type=int)
     parser.add_argument('-load_df', required=False, help='Directory where the .ann files are stored.')
     #parser.add_argument('-ann_dir', required=False, help='Directory where the .ann files are stored.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/JAMIA paper/code/data/association_study SHAC/S4/")
+    parser.add_argument('-dnr_ann_dir', required=False, help='Directory where the .ann files are stored for the DNR/DNI codes.', default="/Users/aleeuw15/Desktop/Research/N2C2 - SDOH/public_repo/sdoh_n2c2track2_ucsf_umcu/dnr_annotations/")
     parser.add_argument('-pred_ann_dirs', required=False, help='Directory where the .ann files are stored.')
 
     args = parser.parse_args()
+    out_dir = [x for x in args.pred_ann_dirs.split('/') if not x == ''][-1]
+    log_file = open('study_results'+out_dir+'.log', "w")
+    sys.stdout = log_file
 
     if not(args.load_df):
 
@@ -257,13 +295,16 @@ if __name__ == '__main__':
 
         with open('admissions_df.p', 'wb') as f:
             pickle.dump(ADMISSIONS,f)
-    #else:
-    #    with open(args.load_df, 'rb') as f:
-    #        ADMISSIONS = pickle.load(f)
 
-    # get SDOH annotations info
 
-    study_results = {}
+    #with open(args.load_df, 'rb') as f:
+    #    ADMISSIONS = pickle.load(f)
+
+
+
+    study_results_dnr_mice_crude, study_results_dnr_cca_crude, study_results_mort_mice_crude, study_results_mort_cca_crude = {}, {}, {}, {}
+    study_results_dnr_mice_adj, study_results_dnr_cca_adj, study_results_mort_mice_adj, study_results_mort_cca_adj = {}, {}, {}, {}
+
     for pred_path in glob(args.pred_ann_dirs+"/*", recursive = False):
         #print(pred_path)
         dirname = pred_path.split('/')[-1]
@@ -272,6 +313,8 @@ if __name__ == '__main__':
             ADMISSIONS = pickle.load(f)
         sdoh_df, ADMISSIONS = read_sdoh_annotations(ADMISSIONS, pred_path, args.mimic_file_alignment, args.n2c2_alignment)
         ADMISSIONS = exclude_n2c2_rows(ADMISSIONS, args.excl_dir, args.mimic_file_alignment)
+
+        ADMISSIONS = add_annotated_dnr_status(ADMISSIONS, args.dnr_ann_dir) # TODO: possibly move this to before loading admissions df
 
         print('ADMISSIONS initial:',len(ADMISSIONS))
         ADMISSIONS = ADMISSIONS[~ADMISSIONS['EVENTNOTEROWID'].isnull()]
@@ -284,13 +327,31 @@ if __name__ == '__main__':
         ADMISSIONS = ADMISSIONS[ADMISSIONS['TO_EXCLUDE']==False]
         print('ADMISSIONS minus fine-tuning data:',len(ADMISSIONS))
 
-        ADMISSIONS['DNR_ANY'] = ADMISSIONS.apply(lambda row: int(row.DNR or row.TXT_DNR), axis=1)
+
+        ADMISSIONS['DNR_ANY'] = ADMISSIONS.apply(lambda row: int(row.DNR or row.TXT_DNR), axis=1) # otherwise use regex
+
         print('ADMISSIONS DNR prevalence:', round(sum(ADMISSIONS['DNR_ANY'])/len(ADMISSIONS)*100,2),'%')
+        print('ADMISSIONS MORT prevalence:', round(sum(ADMISSIONS['HOSPITAL_EXPIRE_FLAG'])/len(ADMISSIONS)*100,2),'%')
+
 
         SELECTION = ADMISSIONS[ADMISSIONS['sdoh_extracted']==True]
+
+        print('SELECTION DNR prevalence:', round(sum(SELECTION['DNR_ANY'])/len(SELECTION)*100,2),'%')
+
+        SELECTION = extract_code_status_from_discharge_summary(SELECTION) # TODO: possibly move this to before loading admissions df
+
+        if (args.n2c2_alignment):
+            SELECTION['DNR_ANY'] = SELECTION.apply(lambda row: int(row.DNR or row.ANNOTATED_DNR_DNI), axis=1) # use DNR/DNI annotations for N2C2 subset
+        print('SELECTION DNR prevalence:', round(sum(SELECTION['DNR_ANY'])/len(SELECTION)*100,2),'%')
+
+        SELECTION['AGE'] = SELECTION['AGE'].astype(float)
+
         print('SELECTION:',len(SELECTION))
         print('SELECTION DNR prevalence:', round(sum(SELECTION['DNR_ANY'])/len(SELECTION)*100,2),'%')
         print('SELECTION DNR N:', round(sum(SELECTION['DNR_ANY']),2))
+
+        print('SELECTION MORT prevalence:', round(sum(SELECTION['HOSPITAL_EXPIRE_FLAG'])/len(SELECTION)*100,2),'%')
+        print('SELECTION MORT N:', round(sum(SELECTION['HOSPITAL_EXPIRE_FLAG']),2))
 
         print('employment_status',collections.Counter(SELECTION['employment_status']))
         print('tobacco_status',collections.Counter(SELECTION['tobacco_status']))
@@ -316,8 +377,7 @@ if __name__ == '__main__':
 
         covars = ['AGE','GENDER','ETHNICITY','RELIGION']
         determinants = ['employment_status','tobacco_status','alcohol_status','drug_status','living_status']
-        imputation_vars = list(set(covars + determinants + ['AGE','GENDER','ETHNICITY','RELIGION','MARITAL_STATUS','ADMISSION_LOCATION','INSURANCE','ADMISSION_TYPE','DIAGNOSIS']))
-        #print(collections.Counter(SELECTION['ETHNICITY']))
+        imputation_vars = list(set(covars + determinants + ['AGE','GENDER','ETHNICITY','RELIGION','MARITAL_STATUS','ADMISSION_LOCATION','INSURANCE','ADMISSION_TYPE']))
         print('imputation_vars',imputation_vars)
 
         ETHNICITY_map = {'UNKNOWN/NOT SPECIFIED':'NOT_SPECIFIED',
@@ -335,7 +395,7 @@ if __name__ == '__main__':
                          'NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER':'OTHER',
                          'WHITE - RUSSIAN':'WHITE',
                          'MULTI RACE ETHNICITY':'OTHER',
-                         'AMERICAN INDIAN/ALASKA NATIVE FEDERALLY RECOGNIZED TRIBE':'OTHER',
+                         'AMERICAN INDIAN/ALASKAm NATIVE FEDERALLY RECOGNIZED TRIBE':'OTHER',
                          'AMERICAN INDIAN/ALASKA NATIVE':'OTHER',
                          'BLACK/AFRICAN':'OTHER',
                          'PORTUGUESE':'OTHER',
@@ -348,8 +408,6 @@ if __name__ == '__main__':
                          'BLACK/AFRICAN AMERICAN':'BLACK_AFRICAN_AMERICAN',
                          'HISPANIC OR LATINO':'HISPANIC_LATINO'
                          }
-
-        #print(collections.Counter(SELECTION['RELIGION']))
 
         RELIGION_map = {
             'CATHOLIC':'CATHOLIC',
@@ -369,16 +427,75 @@ if __name__ == '__main__':
         mytable = TableOne(SELECTION[determinants + covars + ['DNR_ANY']], groupby='DNR_ANY', pval=True)
         print(mytable.tabulate(tablefmt="fancy_grid"))
 
+        #if len(SELECTION) == 1174: # USED to contruct data to annotate DNR/DNI in (using brat; so a .txt and an empty .ann file)
+        #    txtdir = "./n2c2_subset_txts/"
+        #    SELECTION[['EVENTNOTEROWID','DNR','TXT_DNR','DNR_ANY','DISCHARGE_SUMMARY']].to_csv('DNR_info_N2C2_subset.csv')
+        #    for row in SELECTION[['EVENTNOTEROWID','DNR','TXT_DNR','DNR_ANY','DISCHARGE_SUMMARY']].iterrows():
+        #        row=row[1]
+        #        with open(txtdir +'/'+ str(int(row['EVENTNOTEROWID'])) + '.txt', 'w') as f:
+        #            f.write(row['DISCHARGE_SUMMARY'])
+        #        with open(txtdir +'/'+ str(int(row['EVENTNOTEROWID'])) + '.ann', 'w') as f:
+        #            f.write("")
+        #exit()
+
+        #ANNOTATED_DNR_DNI
+
+
+        conf = confusion_matrix(y_true=SELECTION['ANNOTATED_DNR_DNI'].astype(int),y_pred=SELECTION['TXT_DNR'].astype(int))
+        print(conf)
+        p, r, f = precision_score(y_true=SELECTION['ANNOTATED_DNR_DNI'].astype(int),y_pred=SELECTION['TXT_DNR'].astype(int)),recall_score(y_true=SELECTION['ANNOTATED_DNR_DNI'].astype(int),y_pred=SELECTION['TXT_DNR'].astype(int)),f1_score(y_true=SELECTION['ANNOTATED_DNR_DNI'].astype(int),y_pred=SELECTION['TXT_DNR'].astype(int))
+        print(p,r,f)
+        print()
+        for row in SELECTION.iterrows():
+            rowinfo = row[1]
+            if rowinfo['ANNOTATED_DNR_DNI'] == 1 and rowinfo['TXT_DNR'] == 0:
+                print('missed:', int(rowinfo['EVENTNOTEROWID']))
+            if rowinfo['ANNOTATED_DNR_DNI'] == 0 and rowinfo['TXT_DNR'] == 1:
+                print('to check:', int(rowinfo['EVENTNOTEROWID']))
+
+        conf = confusion_matrix(y_true=SELECTION['DNR_ANY'].astype(int),
+                                y_pred=SELECTION['HOSPITAL_EXPIRE_FLAG'].astype(int))
+        print(conf)
+
         # Multivariate analysis
-        study_results[dirname] = {}
+        study_results_dnr_mice_adj[dirname] = {}
+        study_results_dnr_cca_adj[dirname] = {}
+        study_results_mort_mice_adj[dirname] = {}
+        study_results_mort_cca_adj[dirname] = {}
+
+        study_results_dnr_mice_crude[dirname] = {}
+        study_results_dnr_cca_crude[dirname] = {}
+        study_results_mort_mice_crude[dirname] = {}
+        study_results_mort_cca_crude[dirname] = {}
+
         for determinant in determinants:
-            study = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', imputation_vars, cca=False)
-            study_results[dirname][determinant] = study.results
+            study_mice_dnr_adj = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', imputation_vars, cca=False)
+            study_cca_dnr_adj = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', [], cca=True)
+            study_mice_mort_adj = AssociationStudy(SELECTION, [determinant] + covars,'HOSPITAL_EXPIRE_FLAG', imputation_vars, cca=False)
+            study_cca_mort_adj = AssociationStudy(SELECTION, [determinant] + covars,'HOSPITAL_EXPIRE_FLAG', [], cca=True)
+
+            study_mice_dnr_crude = AssociationStudy(SELECTION, [determinant] ,'DNR_ANY', imputation_vars, cca=False)
+            study_cca_dnr_crude = AssociationStudy(SELECTION, [determinant] ,'DNR_ANY', [], cca=True)
+            study_mice_mort_crude = AssociationStudy(SELECTION, [determinant] ,'HOSPITAL_EXPIRE_FLAG', imputation_vars, cca=False)
+            study_cca_mort_crude = AssociationStudy(SELECTION, [determinant] ,'HOSPITAL_EXPIRE_FLAG', [], cca=True)
+
+            study_results_dnr_mice_adj[dirname][determinant] = study_mice_dnr_adj.results
+            study_results_dnr_cca_adj[dirname][determinant] = study_cca_dnr_adj.results
+            study_results_mort_mice_adj[dirname][determinant] = study_mice_mort_adj.results
+            study_results_mort_cca_adj[dirname][determinant] = study_cca_mort_adj.results
+
+            study_results_dnr_mice_crude[dirname][determinant] = study_mice_dnr_crude.results
+            study_results_dnr_cca_crude[dirname][determinant] = study_cca_dnr_crude.results
+            study_results_mort_mice_crude[dirname][determinant] = study_mice_mort_crude.results
+            study_results_mort_cca_crude[dirname][determinant] = study_cca_mort_crude.results
+
+    with open('study_results_'+out_dir+'_adj.p', 'wb') as f:
+        pickle.dump((SELECTION, study_results_dnr_mice_adj, study_results_dnr_cca_adj, study_results_mort_mice_adj, study_results_mort_cca_adj),f)
+
+    with open('study_results_'+out_dir+'_crude.p', 'wb') as f:
+        pickle.dump((SELECTION, study_results_dnr_mice_crude, study_results_dnr_cca_crude, study_results_mort_mice_crude, study_results_mort_cca_crude),f)
 
 
-    out_dir = [x for x in args.pred_ann_dirs.split('/') if not x==''][-1]
-    with open('study_results'+out_dir+'.p', 'wb') as f:
-        pickle.dump((SELECTION, study_results),f)
-
-
+    sys.stdout = old_stdout
+    log_file.close()
 
