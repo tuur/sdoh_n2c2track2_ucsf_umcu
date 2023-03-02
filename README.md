@@ -15,12 +15,14 @@ This code contains the used submission script, and the two main python files to 
 The text data (clinical notes from MIMIC III and the University of Washington) and annotations were provided by the task organizers under a data sharing agreement, for patient privacy reasons.
 For this reason we cannot share this data here.
 
-# Reference
+# References
 
 Results from our submissions are reported in the attached abstract:
 
 > Madhumita Sushil, Atul J. Butte, Ewoud Schuit, Artuur M. Leeuwenberg. [Cross-institution extraction of social determinants of health from 
 clinical notes: an evaluation of methods](https://github.com/tuur/sdoh_n2c2track2_ucsf_umcu/blob/main/N2C2%20Abstract.pdf). AMIA Natural Language Processing Working Group Pre-Symposium. November, 2022.
 
+Results from consequent experiments are reported here:
 
+> Sushil, Madhumita, et al. "Cross-institution text mining to uncover clinical associations: a case study relating social factors and code status in intensive care medicine." arXiv preprint arXiv:2301.06570 (2023).
 
