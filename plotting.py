@@ -14,7 +14,7 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score, r2_
 
 matplotlib.rcParams['font.family'] = ['serif'] #['Family1', 'serif', 'Family2']
 
-topplotdir = './plots-29-03-2023/'
+topplotdir = './plots-29b-03-2023/'
 if not os.path.exists(topplotdir):
     os.makedirs(topplotdir)#shutil.rmtree(topplotdir)
 #os.makedirs(topplotdir)
@@ -120,6 +120,7 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
 
         # ======================== F1 PLOT ========================
 
+
         print(PATHS.keys())
         if 'GT' in PATHS:
             fig = plt.figure(constrained_layout=True, figsize=(6, 2))
@@ -162,10 +163,6 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
             plt.cla()
             plt.clf()
             plt.close()
-
-
-
-
 
 
         # ======================== TABLE 1 ========================
