@@ -38,10 +38,8 @@ class AssociationStudy():
             print(det_error_calibration_gt_df[det_error_calibration])
             print(det_error_calibration_pred_df[det_error_calibration])
 
-
-
         if cca:
-            self.df = self.df.dropna(subset=all_relevant_vars)
+            self.df = self.df.dropna(subset=list(set(xvars + [yvar])))
 
 
         # TODO!!!! for regression recalibration we also need to include the extracted X* to fit X <- X*,Z
@@ -57,6 +55,7 @@ class AssociationStudy():
             print(det_error_calibration_df[det_error_calibration])
             print(det_error_calibration)
             det_dummies = pandas.get_dummies(det_error_calibration_gt_df[self.det_error_calibration], drop_first=True, prefix=det_error_calibration)
+            print(det_dummies, xvars, yvar)
             det_dummy_names = det_dummies.columns
             mmec_dummies = pandas.get_dummies(det_error_calibration_gt_df[self.det_error_vars], drop_first=True)
             mmec_dummies['Intercept']=1
@@ -98,10 +97,13 @@ class AssociationStudy():
             newDet = recal_model.predict(self.Xy_df[list(mmec_dummy_names)])
             print(newDet)
             self.Xy_df[list(det_dummy_names)[0]] =newDet
-            print(det_dummy_names)
+            self.X_df[list(det_dummy_names)[0]] =newDet
 
-            print('!')
+            print(det_dummy_names)
+            print('self.X_df.columns',self.X_df.columns)
             #exit()
+            #print('!')
+
 
         if cca:
             print('CCA ANALYSIS')
@@ -129,6 +131,7 @@ class AssociationStudy():
             results = mice.fit(10, 10)
             print(results.summary())
             self.results=results
+        #exit()
 
         print(cca,'SIZE:',sys.getsizeof(self.results))
 
@@ -384,12 +387,6 @@ if __name__ == '__main__':
         print('ADMISSIONS MORT prevalence:', round(sum(ADMISSIONS['HOSPITAL_EXPIRE_FLAG'])/len(ADMISSIONS)*100,2),'%')
         ADMISSIONS['LOS'] = (ADMISSIONS['DISCHTIME'].apply(pandas.to_datetime)-ADMISSIONS['ADMITTIME'].apply(pandas.to_datetime)).dt.days
 
-
-
-    #study_results_dnr_mice_crude, study_results_dnr_cca_crude, study_results_dnr_mice_adj, study_results_dnr_cca_adj = {}, {}, {}, {}
-    #study_results_mort_mice_crude, study_results_mort_cca_crude, study_results_mort_mice_adj, study_results_mort_cca_adj = {}, {}, {}, {}
-    #study_results_los_mice_crude, study_results_los_cca_crude, study_results_los_mice_adj, study_results_los_cca_adj = {}, {}, {}, {}
-
     adjustment_settings = ['crude', 'adjusted']
     measurement_error_handling = ['determinant_recalibration','none']
     missing_data_mechanisms = ['mice', 'cca']
@@ -417,8 +414,7 @@ if __name__ == '__main__':
 
 
         # excluded documents used to train / fine tune the text mining models
-        #SUBSET500 = ADMISSIONS[ADMISSIONS['TO_EXCLUDE']==True]
-        #print('SUBSET500 length:',len(SUBSET500))
+
         _, SUBSET500 = read_sdoh_annotations(ADMISSIONS, args.excl_dir, args.mimic_file_alignment, args.n2c2_alignment)
         _,SUBSET500EXTR = read_sdoh_annotations(ADMISSIONS, args.mmec_pred + dirname +'/', args.mimic_file_alignment, args.n2c2_alignment)
         print(args.mmec_pred +'/' +dirname +'/')
@@ -493,9 +489,9 @@ if __name__ == '__main__':
         covars = ['AGE','GENDER','ETHNICITY','RELIGION']
         determinants = ['employment_status','tobacco_status','alcohol_status','drug_status','living_status']
         imputation_vars = list(set(covars + determinants + ['AGE','GENDER','ETHNICITY','RELIGION','MARITAL_STATUS','ADMISSION_LOCATION','INSURANCE','ADMISSION_TYPE']))
-        mmec_vars = ['AGE','GENDER']
+         #imputation_vars
         print('imputation_vars',imputation_vars)
-        print('mmec_vars',mmec_vars)
+
 
         ETHNICITY_map = {'UNKNOWN/NOT SPECIFIED':'OTHER',
                          'PATIENT DECLINED TO ANSWER':'OTHER',
@@ -575,18 +571,7 @@ if __name__ == '__main__':
             print(conf)
 
         # Multivariate analysis
-        #study_results_dnr_mice_adj[dirname] = {}
-        #study_results_dnr_cca_adj[dirname] = {}
-        #study_results_dnr_mice_crude[dirname] = {}
-        #study_results_dnr_cca_crude[dirname] = {}
-        #study_results_mort_mice_crude[dirname] = {}
-        #study_results_mort_cca_crude[dirname] = {}
-        #study_results_mort_mice_adj[dirname] = {}
-        #study_results_mort_cca_adj[dirname] = {}
-        #study_results_los_mice_crude[dirname] = {}
-        #study_results_los_cca_crude[dirname] = {}
-        #study_results_los_mice_adj[dirname] = {}
-        #study_results_los_cca_adj[dirname] = {}
+
 
         for mmec in measurement_error_handling:
             for adjustment_setting in adjustment_settings:
@@ -594,6 +579,9 @@ if __name__ == '__main__':
                     for outcome in outcomes:
                         study_results[outcome][adjustment_setting][missing_data_mechanism][mmec][dirname]={}
                         for determinant in determinants:
+
+                            mmec_vars = ['AGE', outcome]
+
                             study_results[outcome][adjustment_setting][missing_data_mechanism][mmec][dirname][
                                     determinant] = AssociationStudy(SELECTION, [
                                                                                    determinant] + covars if adjustment_setting == 'adjusted' else [
@@ -604,28 +592,8 @@ if __name__ == '__main__':
                                                                     det_error_calibration_pred_df=SUBSET500EXTR,
                                                                     det_error_vars=mmec_vars).results
 
-
-
-                                #study_results[outcome][adjustment_setting][missing_data_mechanism][mmec][dirname][determinant] = AssociationStudy(SELECTION, [determinant]+covars if adjustment_setting=='adjusted' else [determinant] ,outcome, imputation_vars, cca=missing_data_mechanism=='cca', linear_outcome=outcome=='LOS', det_error_calibration=determinant if mmec=='determinant_recalibration' else False, det_error_calibration_gt_df=SUBSET500,det_error_calibration_pred_df=SUBSET500EXTR, det_error_vars=mmec_vars).results
-
-    #                        study_results_los_mice_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'LOS', imputation_vars, cca=False, linear_outcome=True).results
-    #                        study_results_los_cca_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'LOS', [], cca=True, linear_outcome=True).results
-    #                        study_results_los_mice_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'LOS', imputation_vars, cca=False, linear_outcome=True).results
-    #                        study_results_los_cca_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'LOS', [], cca=True, linear_outcome=True).results
-
-    #                        study_results_dnr_mice_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'DNR_ANY', imputation_vars, cca=False).results
-    #                        study_results_dnr_cca_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'DNR_ANY', [], cca=True).results
-    #                        study_results_dnr_mice_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', imputation_vars, cca=False).results
-    #                        study_results_dnr_cca_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'DNR_ANY', [], cca=True).results
-
-    #                        study_results_mort_mice_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'HOSPITAL_EXPIRE_FLAG', imputation_vars, cca=False).results
-    #                        study_results_mort_cca_crude[dirname][determinant] = AssociationStudy(SELECTION, [determinant] ,'HOSPITAL_EXPIRE_FLAG', [], cca=True).results
-    #                        study_results_mort_mice_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'HOSPITAL_EXPIRE_FLAG', imputation_vars, cca=False).results
-    #                        study_results_mort_cca_adj[dirname][determinant] = AssociationStudy(SELECTION, [determinant] + covars,'HOSPITAL_EXPIRE_FLAG', [], cca=True).results
-
         if 'GT' in PATHS:
             SELECTIONS[dirname] = SELECTION[determinants + covars + outcomes]
-
 
     measures = {'Precision': {}, 'Recall': {}, 'F1-score': {}}
 
@@ -682,13 +650,6 @@ if __name__ == '__main__':
 
     with open('study_results_'+out_dir+'.p', 'wb') as f:
         pickle.dump((measures,PATHS,SELECTIONS, study_results),f)
-
-#    with open('study_results_'+out_dir+'_adj.p', 'wb') as f:
-#        pickle.dump((measures,PATHS,SELECTIONS, study_results_los_mice_adj, study_results_los_cca_adj, study_results_dnr_mice_adj, study_results_dnr_cca_adj, study_results_mort_mice_adj, study_results_mort_cca_adj),f)
-
-#    with open('study_results_'+out_dir+'_crude.p', 'wb') as f:
-#        pickle.dump((measures,PATHS,SELECTIONS, study_results_los_mice_crude, study_results_los_cca_crude, study_results_dnr_mice_crude, study_results_dnr_cca_crude, study_results_mort_mice_crude, study_results_mort_cca_crude),f)
-
 
     sys.stdout = old_stdout
     log_file.close()
