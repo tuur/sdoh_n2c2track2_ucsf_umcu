@@ -1,0 +1,112 @@
+# packages in environment at /Users/aleeuw15/miniconda3/envs/sdoh:
+#
+# Name                    Version                   Build  Channel
+blas                      2.114                  openblas    conda-forge
+blas-devel                3.9.0           14_osxarm64_openblas    conda-forge
+brat-scoring              0.2.0                    pypi_0    pypi
+brotlipy                  0.7.0           py310h1a28f6b_1002  
+bzip2                     1.0.8                h620ffc9_4  
+ca-certificates           2023.01.10           hca03da5_0  
+catalogue                 2.0.8           py310hbe9552e_1    conda-forge
+certifi                   2022.12.7       py310hca03da5_0  
+cffi                      1.15.1          py310h80987f9_3  
+charset-normalizer        2.0.12             pyhd8ed1ab_0    conda-forge
+click                     8.0.4           py310hca03da5_0  
+colorama                  0.4.4              pyhd3eb1b0_0  
+contourpy                 1.0.7                    pypi_0    pypi
+cryptography              39.0.2          py310hfc83b78_0    conda-forge
+cycler                    0.11.0                   pypi_0    pypi
+cymem                     2.0.6           py310hc377ac9_0  
+cython                    0.29.32         py310hc377ac9_0  
+cython-blis               0.7.9           py310hf1a086a_1    conda-forge
+dataclasses               0.8                pyh6d0b6a4_7  
+dill                      0.3.6                    pypi_0    pypi
+en-core-web-sm            3.3.0                    pypi_0    pypi
+fonttools                 4.39.3                   pypi_0    pypi
+freetype                  2.11.0               h1192e45_0  
+future                    0.18.3          py310hca03da5_0  
+gensim                    4.1.2           py310hc377ac9_0  
+giflib                    5.2.1                h1a28f6b_0  
+idna                      3.3                pyhd3eb1b0_0  
+jinja2                    3.1.1              pyhd8ed1ab_0    conda-forge
+joblib                    1.2.0                    pypi_0    pypi
+jpeg                      9e                   h1a28f6b_0  
+kiwisolver                1.4.4                    pypi_0    pypi
+langcodes                 3.3.0              pyhd3eb1b0_0  
+lcms2                     2.12                 hba8e193_0  
+libblas                   3.9.0           14_osxarm64_openblas    conda-forge
+libcblas                  3.9.0           14_osxarm64_openblas    conda-forge
+libcxx                    12.0.0               hf6beb65_1  
+libffi                    3.4.2                hc377ac9_2  
+libgfortran               5.0.0           11_1_0_h6a59814_26  
+libgfortran5              11.1.0              h6a59814_26  
+liblapack                 3.9.0           14_osxarm64_openblas    conda-forge
+liblapacke                3.9.0           14_osxarm64_openblas    conda-forge
+libopenblas               0.3.20          openmp_h2209c59_0    conda-forge
+libpng                    1.6.37               hb8d0fd4_0  
+libsqlite                 3.40.0               h76d750c_0    conda-forge
+libtiff                   4.2.0                h11e2f9f_0  
+libwebp                   1.2.2                h68602c7_0  
+libwebp-base              1.2.2                h1a28f6b_0  
+libzlib                   1.2.13               h03a7124_4    conda-forge
+llvm-openmp               14.0.0               hd125106_0    conda-forge
+lz4-c                     1.9.3                hc377ac9_0  
+markupsafe                2.1.2           py310h8e9501a_0    conda-forge
+matplotlib                3.7.1                    pypi_0    pypi
+murmurhash                1.0.7           py310hc377ac9_0  
+ncurses                   6.3                  h1a28f6b_2  
+ninja                     1.10.2               hca03da5_5  
+ninja-base                1.10.2               h525c30c_5  
+numpy                     1.23.3          py310h220015d_1  
+numpy-base                1.23.3          py310h742c864_1  
+openblas                  0.3.20          openmp_h745f6c2_0    conda-forge
+openssl                   3.0.8                h03a7124_0    conda-forge
+packaging                 21.3               pyhd3eb1b0_0  
+pandas                    1.5.3                    pypi_0    pypi
+pathy                     0.6.1              pyhd8ed1ab_0    conda-forge
+patsy                     0.5.3                    pypi_0    pypi
+pillow                    9.2.0           py310h4d1bdd5_1  
+pip                       22.0.4             pyhd8ed1ab_0    conda-forge
+preshed                   3.0.6           py310hc377ac9_0  
+pycparser                 2.21               pyhd3eb1b0_0  
+pydantic                  1.8.2                    pypi_0    pypi
+pyopenssl                 22.0.0             pyhd3eb1b0_0  
+pyparsing                 3.0.8              pyhd8ed1ab_0    conda-forge
+pysocks                   1.7.1           py310hca03da5_0  
+python                    3.10.9          h3ba56d0_0_cpython    conda-forge
+python-dateutil           2.8.2                    pypi_0    pypi
+python_abi                3.10                    3_cp310    conda-forge
+pytorch                   1.10.2          cpu_py310h36d6a73_0  
+pytz                      2022.7.1                 pypi_0    pypi
+readline                  8.1.2                h1a28f6b_1  
+requests                  2.27.1             pyhd3eb1b0_0  
+scikit-learn              1.2.2                    pypi_0    pypi
+scipy                     1.8.0           py310h6ecf4ae_1    conda-forge
+setuptools                67.6.0             pyhd8ed1ab_0    conda-forge
+shellingham               1.4.0              pyh44b312d_0    conda-forge
+six                       1.16.0                   pypi_0    pypi
+sklearn                   0.0.post1                pypi_0    pypi
+smart_open                5.2.1              pyhd8ed1ab_0    conda-forge
+spacy                     3.3.1           py310h09aeb25_0  
+spacy-legacy              3.0.9              pyhd8ed1ab_0    conda-forge
+spacy-loggers             1.0.2              pyhd8ed1ab_0    conda-forge
+sqlite                    3.38.2               h1058600_0  
+srsly                     2.4.3           py310hc377ac9_0  
+statsmodels               0.13.5                   pypi_0    pypi
+tableone                  0.7.12                   pypi_0    pypi
+tabulate                  0.9.0                    pypi_0    pypi
+thinc                     8.0.15          py310h09aeb25_0  
+threadpoolctl             3.1.0                    pypi_0    pypi
+tk                        8.6.12               hb8d0fd4_0  
+torchvision               0.11.3          cpu_py310h15370ac_2  
+tqdm                      4.65.0             pyhd8ed1ab_1    conda-forge
+typer                     0.4.1              pyhd8ed1ab_0    conda-forge
+typing-extensions         4.2.0                hd8ed1ab_1    conda-forge
+typing_extensions         4.2.0              pyha770c72_1    conda-forge
+tzdata                    2022g                h04d1e81_0  
+urllib3                   1.26.14         py310hca03da5_0  
+wasabi                    0.9.1              pyhd8ed1ab_0    conda-forge
+wheel                     0.37.1             pyhd3eb1b0_0  
+xz                        5.2.10               h80987f9_1  
+zlib                      1.2.13               h03a7124_4    conda-forge
+zstd                      1.4.9                h8574219_1  
