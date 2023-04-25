@@ -6,7 +6,7 @@ This code is associated with our submissions to the [N2C2 Shared Task - Track 2]
 This code contains the used submission script, and the two main python files to train or apply our BIO-scheme base SDOH models:
 
 - `sdoh_model_bert_bio.py`: The code used for all BERT settings (call `sdoh_model_bert_bio.py -h` for more detailed information).
-- `sdoh_model_bio.py`: The code used for all other settings (call `sdoh_model_bio.py` for more detailed information).
+- `sdoh_model_bio.py`: The code used for all other settings (call `sdoh_model_bio.py -h` for more detailed information).
 - `Submission_script.sh`: The script that was used to make our submissions for the shared task.
 - `pretrain_embs.py`: The script used to pretrain the fastText embeddings (on the MIMIC III and the UCSF data).
 - `association_study_experiments.sh`: The script used to conduct the experiments from the arXiv article.
