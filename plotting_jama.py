@@ -12,9 +12,13 @@ import matplotlib
 
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score, r2_score
 
-matplotlib.rcParams['font.family'] = ['serif'] #['Family1', 'serif', 'Family2']
+from matplotlib.ticker import FormatStrFormatter
+from matplotlib import rc
+rc('text', usetex=True)
 
-topplotdir = './jplots-19-04-2023/'
+#matplotlib.rcParams['font.family'] = ['serif'] #['Family1', 'serif', 'Family2']
+
+topplotdir = './jplots-24-04-2023/'
 if not os.path.exists(topplotdir):
     os.makedirs(topplotdir)#shutil.rmtree(topplotdir)
 #os.makedirs(topplotdir)
@@ -137,6 +141,7 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                     handles.append(pts)
 
                 ax.set_ylabel(measure, fontsize='x-small')
+                ax.set_xlabel('Size of manually labeled data', fontsize='x-small')
                 ax.set_xticks([0] + Xs, ['0']+[str(x) for x in Xs], fontsize='x-small')
                 #ax.yticks(fontsize='x-small')
                 ax.tick_params(axis='both', which='both', labelsize='x-small')
@@ -158,6 +163,13 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
             mytable = TableOne(SELECTIONS['GT'][['AGE', 'GENDER', 'ETHNICITY', 'RELIGION'] + determinants + ['DNR_ANY','HOSPITAL_EXPIRE_FLAG','LOS']]) #, pval=True)#groupby='DNR_ANY'
             print('LOS mean', np.mean(SELECTIONS['GT']['LOS']),'IQR:', np.percentile(SELECTIONS['GT']['LOS'], [25 ,75]))
             print(mytable.tabulate(tablefmt="fancy_grid"))
+        else:
+            print('BERT-2 Table 1:')
+            mytable = TableOne(SELECTIONS['BERT-2'][['AGE', 'GENDER', 'ETHNICITY', 'RELIGION'] + determinants + ['DNR_ANY','HOSPITAL_EXPIRE_FLAG','LOS']]) #, pval=True)#groupby='DNR_ANY'
+            print('LOS mean', np.mean(SELECTIONS['BERT-2']['LOS']),'IQR:', np.percentile(SELECTIONS['BERT-2']['LOS'], [25 ,75]))
+            print(mytable.tabulate(tablefmt="fancy_grid"))
+
+
 
 
         # ======================== ODDS RATIO PLOTS ========================
@@ -196,7 +208,7 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                 shutil.rmtree(plotdir)
             os.makedirs(plotdir)
 
-            gs = gridspec.GridSpec(5, 3)  # , width_ratios=[1, 1, 1, 1, 1], height_ratios=[1, 1, 1])
+            gs = gridspec.GridSpec(5, 3, wspace=0.17,hspace=0.05, width_ratios=[1,1,1], height_ratios=[1,1,1,1,1])  # , width_ratios=[1, 1, 1, 1, 1], height_ratios=[1, 1, 1])
             xs = {'employment_status': 0, 'living_status': 1, 'drug_status': 2, 'alcohol_status': 3,
                   'tobacco_status': 4}
             ys = {'dnr': 0, 'los': 2, 'mort': 1}
@@ -204,18 +216,27 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
 
             subplot_captions = {(d, o): '' for o in ys for d in xs}
             ylabels = {(d, o): '' for o in ys for d in xs}
-            xlabel = 'Size of annotated data'
+            xlabels = {(d, o): '' for o in ys for d in xs} #'Size of annotated data'
+            show_xticks = {(d, o): False for o in ys for d in xs}
 
-            ylabels[('employment_status','dnr')]='Employment status: employed\nOR'
-            ylabels[('living_status','dnr')]='Living status: with family\nOR'
-            ylabels[('drug_status','dnr')]='Drugs: current or past use\nOR'
-            ylabels[('alcohol_status','dnr')]='Alcohol: current or past use\nOR'
-            ylabels[('tobacco_status','dnr')]='Tobacco: current or past use\nOR'
-            ylabels[('employment_status','mort')]='OR'
-            ylabels[('living_status','mort')]='OR'
-            ylabels[('drug_status','mort')]='OR'
-            ylabels[('alcohol_status','mort')]='OR'
-            ylabels[('tobacco_status','mort')]='OR'
+            show_xticks[('tobacco_status','dnr')]=True
+            show_xticks[('tobacco_status','mort')]=True
+            show_xticks[('tobacco_status','los')]=True
+
+            xlabels[('tobacco_status','dnr')] = 'Size of manually labeled data'
+            xlabels[('tobacco_status','mort')] = 'Size of manually labeled data'
+            xlabels[('tobacco_status','los')] = 'Size of manually labeled data'
+
+            ylabels[('employment_status','dnr')]=r'\textbf{Employment status: employed}'+'\nOdds ratio'
+            ylabels[('living_status','dnr')]=r'\textbf{Living status: with family}'+'\nOdds ratio'
+            ylabels[('drug_status','dnr')]=r'\textbf{Drugs: current or past use}'+'\nOdds ratio'
+            ylabels[('alcohol_status','dnr')]=r'\textbf{Alcohol: current or past use}'+'\nOdds ratio'
+            ylabels[('tobacco_status','dnr')]=r'\textbf{Tobacco: current or past use}'+'\nOdds ratio'
+            ylabels[('employment_status','mort')]='Odds ratio'
+            ylabels[('living_status','mort')]='Odds ratio'
+            ylabels[('drug_status','mort')]='Odds ratio'
+            ylabels[('alcohol_status','mort')]='Odds ratio'
+            ylabels[('tobacco_status','mort')]='Odds ratio'
             ylabels[('employment_status','los')]='Beta coefficient'
             ylabels[('living_status','los')]='Beta coefficient'
             ylabels[('drug_status','los')]='Beta coefficient'
@@ -231,14 +252,14 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                 outcome = outcome.replace('_mice','').replace('_cca','')
                 missing_data_handling_method=outcome+'_'+missing_data_m
                 print(resname,missing_data_handling_method,outcome)
-                print(study_results['GT'])
+                #print(study_results['GT'])
 
                 for det in determinants:
                     print(det)
                     handles=[]
                     ax = subplot_grids[(det, outcome)]
-                    ax.get_figure().set_figwidth(12)
-                    ax.get_figure().set_figheight(15)
+                    ax.get_figure().set_figwidth(16)
+                    ax.get_figure().set_figheight(20)
                     if 'GT' in study_results:
                        gt_mu, gt_lower, gt_upper = get_est_and_ci(study_results['GT'][det], det, missing_data_handling_method)
                        #exit()
@@ -253,7 +274,8 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                         uw_mu, uw_lower, uw_upper = get_est_and_ci(study_results[prefix+'1'][det], det, missing_data_handling_method)
                         uw_err = uw_upper-uw_lower
                         VALUES[missing_data_handling_method][det][prefix+'1']= uw_mu
-                        GTS[missing_data_handling_method][det][prefix+'1']= gt_mu
+                        if 'GT' in study_results:
+                            GTS[missing_data_handling_method][det][prefix+'1']= gt_mu
 
 
                         transfer_mus_and_cis = [get_est_and_ci(study_results[prefix+'6'][det], det, missing_data_handling_method), get_est_and_ci(study_results[prefix+'5'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'4'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'3'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'2'][det], det, missing_data_handling_method) ]
@@ -262,10 +284,12 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                         transfer_uppers = [cupper for _,_,cupper in transfer_mus_and_cis]
                         transfer_err = [cupper-clower for _,clower,cupper in transfer_mus_and_cis]
                         for num,est in zip(['6','5','4','3','2'],transfer_mus):
-                            GTS[missing_data_handling_method][det][prefix + num] = gt_mu
+                            if 'GT' in study_results:
+                                GTS[missing_data_handling_method][det][prefix + num] = gt_mu
                             VALUES[missing_data_handling_method][det][prefix + num] =  est
 
-                        transfer_biases = {gt_mu-tr_mu for tr_mu in transfer_mus}
+                        if 'GT' in study_results:
+                            transfer_biases = {gt_mu-tr_mu for tr_mu in transfer_mus}
 
                         scratch_mus_and_cis = [get_est_and_ci(study_results[prefix+'11'][det], det, missing_data_handling_method), get_est_and_ci(study_results[prefix+'10'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'9'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'8'][det], det, missing_data_handling_method),get_est_and_ci(study_results[prefix+'7'][det], det, missing_data_handling_method) ]
                         scratch_mus = [mu for mu,_,_ in scratch_mus_and_cis]
@@ -273,7 +297,8 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                         scratch_uppers = [cupper for _,_,cupper in scratch_mus_and_cis]
                         scratch_err = [cupper-clower for _,clower,cupper in scratch_mus_and_cis]
                         for num,est in zip(['11','10','9','8','7'],scratch_mus):
-                            GTS[missing_data_handling_method][det][prefix + num] = gt_mu
+                            if 'GT' in study_results:
+                                GTS[missing_data_handling_method][det][prefix + num] = gt_mu
                             VALUES[missing_data_handling_method][det][prefix + num] = est
 
                         #xsize = 8
@@ -295,16 +320,16 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                         #ax.fill_between(Xs, scratch_lowers, scratch_uppers, facecolor=colorstyle, alpha=0.1)
 
                     if 'GT' in study_results:
-                        gtr = ax.axhline(y=gt_mu, color='green', linewidth=.9, label='Reference (annotated)') # GT
+                        gtr = ax.axhline(y=gt_mu, color='green', linewidth=.9, label='Reference (manually labeled)') # GT
                         handles.append(gtr)
                         #ax.fill_between([-50]+[j+50 for j in Xs], [gt_lower]*6,  [gt_upper]*6, facecolor='green', alpha=0.1) # confidence interval
 
                     ax.axis(ymin=yminvalue[missing_data_handling_method], ymax=ymaxvalue[missing_data_handling_method])
-                    ax.set_ylabel(ylabels[(det, outcome)], fontsize='x-small')
+                    ax.set_ylabel(ylabels[(det, outcome)], fontsize='small')
                     #ax.set_xlabel()
-                    ax.set_title(subplot_captions[(det,outcome)], loc='center', fontsize='small')
+                    ax.set_title(subplot_captions[(det,outcome)], loc='center')#, fontsize='small')
 
-                    ax.set_xticks([0] + Xs, ['0']+[str(x) for x in Xs], fontsize='x-small')
+                    ax.set_xticks([0] + Xs, ['0']+[str(x) for x in Xs])#, fontsize='small')
 
                     if 'los' in missing_data_handling_method:
                         ntr = ax.axhline(y=0, linestyle='dotted',color='grey',linewidth=0.8)
@@ -315,13 +340,17 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
                         yticks = [yminvalue[missing_data_handling_method]+(x * (ymaxvalue[missing_data_handling_method]-yminvalue[missing_data_handling_method]) / 10) for x in range(1, 10)]
                         ax.set_yticks(yticks)  # , fontfamily='serif', fontsize=8)
                     handles.append(ntr)
-                    ax.set_yticklabels(ax.get_yticklabels(), fontsize='x-small')
+                    ax.set_yticklabels(ax.get_yticklabels())#, fontsize='small')
+                    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
 
                     ax.set_xlim(left=-50, right=550)
                     if (det,outcome) in legend_at:
-                        ax.legend(handles=handles, prop={'size': 6})
+                        ax.legend(handles=handles, loc='upper left', prop={'size': 10})
 
-                    ax.set_xlabel(xlabel, fontsize='x-small')
+                    ax.set_xlabel(xlabels[(det, outcome)]) #, fontsize='small')
+                    if not show_xticks[(det, outcome)]:
+                        ax.set_xticks([0] + Xs, ['']+['' for x in Xs])
+
                     #print(ax.get_yticks())
                     #plt.savefig(plotdir+ '/'+det+'_'+resname+'.png',dpi=300)
             plt.savefig(plotdir + '/'+ resname + '_' + missing_data_m + '_association_plot.png', dpi=300,  bbox_inches='tight')
@@ -461,111 +490,64 @@ for measurement_error_recalibration_setting in ['determinant_recalibration', 'no
 
             # =================== F1 - BIAS FIGUREs ===================
 
-            # FOR MICE
-            gs = gridspec.GridSpec(1, 3)
-            left = plt.subplot(gs[0, 0])
-            middle = plt.subplot(gs[0, 1])
-            right = plt.subplot(gs[0, 2])
 
-            plt_grid = {'dnr_mice':left,'mort_mice':middle,'los_mice':right}
-            plotdir = topplotdir + resname + '/'
-            for setting in plt_grid:
-                ax = plt_grid[setting]
-                ests = VALUES[setting]
-                gts = GTS[setting]
-                ax.get_figure().set_figwidth(10)
-                ax.get_figure().set_figheight(10)
+            for md_plot_variant in ['mice','cca']:
+                # FOR MICE
+                gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1], height_ratios=[1], wspace=0.25)
+                left = plt.subplot(gs[0, 0])
+                middle = plt.subplot(gs[0, 1])
+                right = plt.subplot(gs[0, 2])
 
-                all_absbias, all_f1s = [], []
-                for det, colorstyle in zip(determinants,['red','blue','green','black','purple']): #  ['employment_status', 'living_status','drug_status','alcohol_status','tobacco_status']
-                    depairs = [(det, m) for m in ests[det]]
-                    absbias = [abs(gts[d][m]-ests[d][m]) for d,m in depairs]
-                    f1s = [DEF_MEASURES[d][m]['F1-score'] for d,m in depairs]
-                    ax.scatter(f1s, absbias, color=colorstyle, alpha=0.8)
-                    print('f1s,absbias:',f1s,absbias)
-                    m, b = np.polyfit(f1s, absbias, deg=1)
-                    r2 = r2_score(absbias, np.array(f1s)*m+b)
-                    num_spaces = max([len(determinants)])-len(det)
-                    label = det[0].title() + det[1:].replace('_',' ') + ' '*num_spaces*2 + '\t' + f'$y = {m:.2f}x {b:+.2f}$' + '\t' + f'$r^2 = {r2:.2f}$'
-                    ax.axline(xy1=(0, b), slope=m, color=colorstyle, label=label,linewidth=0.7, alpha=0.8, linestyle='dashed')
-                    all_absbias += absbias
-                    all_f1s += f1s
-
-                all_m, all_b = np.polyfit(all_f1s, all_absbias, deg=1)
-                all_r2 = r2_score(all_absbias, np.array(all_f1s) * all_m + all_b)
-                label = 'OVERALL' + ' '*num_spaces*2 + '\t' + f'$y = {all_m:.2f}x {all_b:+.2f}$' + '\t' + f'$r^2 = {all_r2:.2f}$'
-                ax.axline(xy1=(0, all_b), slope=all_m, color='grey', label=label,linewidth=0.7, alpha=1)
-
-                ax.set_xlim(0,1)
-                ax.set_ylim(-0.1, 3)
-                if 'los' in setting:
-                    ax.set_ylabel("Absolute error in beta coefficient")#, fontsize='small')
-                else:
-                    ax.set_ylabel("Absolute error in odds ratio")#, fontsize='small')
-                ax.set_xlabel("Variable-specific F1-score")#, fontsize='small')
-                ax.legend(fontsize='small')
-            #    ax.set_aspect('equal')
+                plt_grid = {'dnr_'+md_plot_variant:left,'mort_'+md_plot_variant:middle,'los_'+md_plot_variant:right}
+                plotdir = topplotdir + resname + '/'
+                for plot_ix, setting in enumerate(plt_grid):
+                    ax = plt_grid[setting]
+                    ests = VALUES[setting]
+                    gts = GTS[setting]
+                    ax.get_figure().set_figwidth(13)
+                    ax.get_figure().set_figheight(4)
 
 
+                    all_absbias, all_f1s = [], []
+                    for det, colorstyle in zip(determinants,['red','blue','green','black','purple']): #  ['employment_status', 'living_status','drug_status','alcohol_status','tobacco_status']
+                        depairs = [(det, m) for m in ests[det]]
+                        absbias = [abs(gts[d][m]-ests[d][m]) for d,m in depairs]
+                        f1s = [DEF_MEASURES[d][m]['F1-score'] for d,m in depairs]
+                        ax.scatter(f1s, absbias, color=colorstyle, alpha=0.8)
+                        print('f1s,absbias:',f1s,absbias)
+                        m, b = np.polyfit(f1s, absbias, deg=1)
+                        r2 = r2_score(absbias, np.array(f1s)*m+b)
+                        num_spaces = max([len(determinants)])-len(det)
+                        if plot_ix == 0:
+                            label = det[0].title() + det[1:].replace('_',' ')  + ': ' + f'$r^2 = {r2:.2f}$' # ' '*num_spaces*2 + '\t' + f'$y = {m:.2f}x {b:+.2f}$'
+                        else:
+                            label = f'$r^2 = {r2:.2f}$'
+                        ax.axline(xy1=(0, b), slope=m, color=colorstyle, label=label,linewidth=0.7, alpha=0.8, linestyle='dashed')
+                        all_absbias += absbias
+                        all_f1s += f1s
 
-            # FOR CCA
-            plt.savefig(plotdir + '/'+ resname + '_def_f1_abs_bias_plot_detgrouped_mice.png', dpi=300)#,  bbox_inches='tight')
-            plt.cla()
-            plt.clf()
+                    all_m, all_b = np.polyfit(all_f1s, all_absbias, deg=1)
+                    all_r2 = r2_score(all_absbias, np.array(all_f1s) * all_m + all_b)
+                    if plot_ix == 0:
+                        label = 'OVERALL: '  + f'$r^2 = {all_r2:.2f}$' #' '*num_spaces*2 + '\t' + f'$y = {all_m:.2f}x {all_b:+.2f}$' + '\t'
+                    else:
+                        label =  f'$r^2 = {all_r2:.2f}$'
+                    ax.axline(xy1=(0, all_b), slope=all_m, color='grey', label=label,linewidth=1, alpha=1)
+                    ax.set_title(subplot_captions[('employment_status',setting.split('_')[0])], loc='center')#, fontsize='small')
 
-            # Plot DNR, LOS, MORT next to each other: Fig 6
-            gs = gridspec.GridSpec(1, 5)
-            left = plt.subplot(gs[0, 0])
-            middle = plt.subplot(gs[0, 2])
-            right = plt.subplot(gs[0, 4])
+                    ax.set_xlim(0,1)
+                    ax.set_ylim(-0.1, 2.5)
+                    if 'los' in setting:
+                        ax.set_ylabel("Absolute error in beta coefficient")#, fontsize='small')
+                    else:
+                        ax.set_ylabel("Absolute error in odds ratio")#, fontsize='small')
+                    ax.set_xlabel("Variable-specific F1-score")#, fontsize='small')
+                    ax.legend(fontsize='small')
+                #    ax.set_aspect('equal')
 
-            plt_grid = {'dnr_cca': left, 'mort_cca': middle, 'los_cca': right}
-            plotdir = topplotdir + resname + '/'
-            for setting in plt_grid:
-                ax = plt_grid[setting]
-                ests = VALUES[setting]
-                gts = GTS[setting]
-                ax.get_figure().set_figwidth(10)
-                ax.get_figure().set_figheight(10)
-
-                all_absbias, all_f1s = [], []
-                for det, colorstyle in zip(determinants, ['red', 'blue', 'green', 'black',
-                                                          'purple']):  # ['employment_status', 'living_status','drug_status','alcohol_status','tobacco_status']
-                    depairs = [(det, m) for m in ests[det]]
-                    absbias = [abs(gts[d][m] - ests[d][m]) for d, m in depairs]
-                    f1s = [DEF_MEASURES[d][m]['F1-score'] for d, m in depairs]
-                    ax.scatter(f1s, absbias, color=colorstyle, alpha=0.8)
-                    print('f1s,absbias:', f1s, absbias)
-                    m, b = np.polyfit(f1s, absbias, deg=1)
-                    r2 = r2_score(absbias, np.array(f1s) * m + b)
-                    num_spaces = max([len(determinants)]) - len(det)
-                    label = det[0].title() + det[1:].replace('_',
-                                                             ' ') + ' ' * num_spaces * 2 + '\t' + f'$y = {m:.2f}x {b:+.2f}$' + '\t' + f'$r^2 = {r2:.2f}$'
-                    ax.axline(xy1=(0, b), slope=m, color=colorstyle, label=label, linewidth=0.7, alpha=0.8,
-                              linestyle='dashed')
-                    all_absbias += absbias
-                    all_f1s += f1s
-
-                all_m, all_b = np.polyfit(all_f1s, all_absbias, deg=1)
-                all_r2 = r2_score(all_absbias, np.array(all_f1s) * all_m + all_b)
-                label = 'OVERALL' + ' ' * num_spaces * 2 + '\t' + f'$y = {all_m:.2f}x {all_b:+.2f}$' + '\t' + f'$r^2 = {all_r2:.2f}$'
-                ax.axline(xy1=(0, all_b), slope=all_m, color='grey', label=label, linewidth=0.7, alpha=1)
-
-                ax.set_xlim(0, 1)
-                ax.set_ylim(-0.1, 3)
-                if 'los' in setting:
-                    ax.set_ylabel("Absolute error in beta coefficient")  # , fontsize='small')
-                else:
-                    ax.set_ylabel("Absolute error in odds ratio")  # , fontsize='small')
-                ax.set_xlabel("Variable-specific F1-score")  # , fontsize='small')
-                ax.legend(fontsize='small')
-            #    ax.set_aspect('equal')
-
-            # ax.get_figure().set_size_inches(15,15)
-            plt.savefig(plotdir + '/' + resname + '_def_f1_abs_bias_plot_detgrouped_cca.png',
-                        dpi=300)  # ,  bbox_inches='tight')
-            plt.cla()
-            plt.clf()
+                plt.savefig(plotdir + '/'+ resname + '_def_f1_abs_bias_plot_detgrouped_'+md_plot_variant+'.png', dpi=300,  bbox_inches='tight')
+                plt.cla()
+                plt.clf()
 
 
 
