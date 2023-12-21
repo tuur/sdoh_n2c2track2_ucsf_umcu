@@ -1,5 +1,5 @@
 
-This code is associated with our submissions to the [N2C2 Shared Task - Track 2](https://n2c2.dbmi.hms.harvard.edu/2022-track-2), on extraction of social determinants of health from clinical notes. It was also used in a consequent study on the effects of different NLP models on downstream medical association study results.
+This code is associated with our submissions to the [N2C2 Shared Task - Track 2](https://n2c2.dbmi.hms.harvard.edu/2022-track-2), on extraction of social determinants of health (SDoH) from clinical notes. It was also used in a consequent study on the effects of different NLP models on downstream medical association study results.
 
 # What is here:
 
@@ -13,7 +13,7 @@ This code contains the used submission script, and the two main python files to 
 
 # What is not here:
 
-The text data (clinical notes from MIMIC III and the University of Washington) and annotations were provided by the task organizers under a data sharing agreement, for patient privacy reasons.
+The text data (clinical notes from MIMIC III and the University of Washington) and SDoH annotations were provided by the task organizers under a data sharing agreement, for patient privacy reasons.
 For this reason we cannot share this data here.
 
 The DNR/DNI annotations can be found on this repository: https://github.com/tuur/code-status-annotations-mimic
