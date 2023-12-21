@@ -16,6 +16,8 @@ This code contains the used submission script, and the two main python files to 
 The text data (clinical notes from MIMIC III and the University of Washington) and annotations were provided by the task organizers under a data sharing agreement, for patient privacy reasons.
 For this reason we cannot share this data here.
 
+The DNR/DNI annotations can be found on this repository: https://github.com/tuur/code-status-annotations-mimic
+
 # References
 
 Results from our submissions are reported in the attached abstract:
